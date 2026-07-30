@@ -1,12 +1,16 @@
-import { type App, getLanguage, PluginSettingTab, Setting } from "obsidian";
+import {
+    type App,
+    getLanguage,
+    PluginSettingTab,
+    type Setting,
+    type SettingDefinitionItem,
+} from "obsidian";
 import type { SWSettings } from "./@types/settings";
 import { getTranslate } from "./i18n";
 import type ShowWhitespacePlugin from "./main";
 
 export class ShowWhitespaceSettingsTab extends PluginSettingTab {
     plugin: ShowWhitespacePlugin;
-    newSettings: SWSettings;
-    saveButton: HTMLElement;
 
     constructor(app: App, plugin: ShowWhitespacePlugin) {
         super(app, plugin);
@@ -14,153 +18,125 @@ export class ShowWhitespaceSettingsTab extends PluginSettingTab {
         this.icon = "eye";
     }
 
-    async save() {
-        await this.plugin.updateSettings(this.newSettings);
+    getControlValue(key: string): unknown {
+        return (this.plugin.settings as unknown as Record<string, unknown>)[
+            key
+        ];
     }
 
-    display(): void {
-        void this.plugin.loadSettings().then(() => this.reset());
+    async setControlValue(key: string, value: unknown): Promise<void> {
+        await this.plugin.updateSettings({
+            ...this.plugin.settings,
+            [key]: value,
+        } as SWSettings);
     }
 
-    async reset(): Promise<void> {
-        this.newSettings = JSON.parse(
-            JSON.stringify(this.plugin.settings),
-        ) as SWSettings;
-        this.drawElements();
+    private toggle(
+        key: keyof SWSettings,
+        name: string,
+        desc: string,
+    ): SettingDefinitionItem {
+        return {
+            name,
+            desc,
+            control: { type: "toggle" as const, key: key as string },
+        };
     }
 
-    private toggle(key: keyof SWSettings, name: string, desc: string): void {
-        new Setting(this.containerEl)
-            .setName(name)
-            .setDesc(desc)
-            .addToggle((toggle) =>
-                toggle
-                    .setValue(this.newSettings[key] as boolean)
-                    .onChange(async (value) => {
-                        (this.newSettings[key] as boolean) = value;
-                        this.drawElements();
-                    }),
-            );
-    }
-
-    drawElements(): void {
+    getSettingDefinitions(): SettingDefinitionItem[] {
         const id = this.plugin.manifest.id;
         const lang = getLanguage();
         const i18n = getTranslate(lang);
-        const name = i18n.manifestName || this.plugin.manifest.name;
 
-        this.containerEl.empty();
         this.containerEl.addClass(id);
-        new Setting(this.containerEl).setHeading().setName(name);
 
-        new Setting(this.containerEl)
-            .setName(i18n.saveSettings.name)
-            .setClass(`${id}-save-reset`)
-            .addButton((button) =>
-                button
-                    .setIcon("reset")
-                    .setTooltip(i18n.saveSettings.resetBtn.tooltip)
-                    .onClick(async () => {
-                        await this.reset();
-                        console.debug("(SW-CM6) Configuration reset");
-                    }),
-            )
-            .addButton((button) => {
-                button
-                    .setIcon("save")
-                    .setTooltip(i18n.saveSettings.saveBtn.tooltip)
-                    .onClick(async () => {
-                        await this.save();
-                    });
-                this.saveButton = button.buttonEl;
-            });
+        return [
+            this.toggle(
+                "disablePluginStyles",
+                i18n.suppressPluginStyles.name,
+                i18n.suppressPluginStyles.desc,
+            ),
 
-        this.toggle(
-            "disablePluginStyles",
-            i18n.suppressPluginStyles.name,
-            i18n.suppressPluginStyles.desc,
-        );
+            // ── Markers ──────────────────────────────────────────────────────
+            {
+                name: i18n.markersSection.name,
+                desc: i18n.markersSection.desc,
+                render: (setting: Setting): void => {
+                    setting.setHeading();
+                },
+            },
+            this.toggle(
+                "showLineEndings",
+                i18n.showLineEndings.name,
+                i18n.showLineEndings.desc,
+            ),
+            this.toggle(
+                "showHardLineBreaks",
+                i18n.showHardLineBreaks.name,
+                i18n.showHardLineBreaks.desc,
+            ),
+            this.toggle(
+                "showTrailingWhitespace",
+                i18n.showTrailingWhitespace.name,
+                i18n.showTrailingWhitespace.desc,
+            ),
+            this.toggle(
+                "showConsecutiveWhitespace",
+                i18n.showConsecutiveWhitespace.name,
+                i18n.showConsecutiveWhitespace.desc,
+            ),
 
-        // ── Markers ──────────────────────────────────────────────────────────
-        new Setting(this.containerEl)
-            .setHeading()
-            .setName(i18n.markersSection.name);
-        this.containerEl.createEl("p", { text: i18n.markersSection.desc });
+            // ── Structural ───────────────────────────────────────────────────
+            {
+                name: i18n.structuralSection.name,
+                render: (setting: Setting): void => {
+                    setting.setHeading();
+                },
+            },
+            this.toggle(
+                "showBlockquoteMarkers",
+                i18n.showBlockquoteMarkers.name,
+                i18n.showBlockquoteMarkers.desc,
+            ),
+            this.toggle(
+                "outlineListMarkers",
+                i18n.highlightListMarkers.name,
+                i18n.highlightListMarkers.desc,
+            ),
 
-        this.toggle(
-            "showLineEndings",
-            i18n.showLineEndings.name,
-            i18n.showLineEndings.desc,
-        );
-        this.toggle(
-            "showHardLineBreaks",
-            i18n.showHardLineBreaks.name,
-            i18n.showHardLineBreaks.desc,
-        );
-        this.toggle(
-            "showTrailingWhitespace",
-            i18n.showTrailingWhitespace.name,
-            i18n.showTrailingWhitespace.desc,
-        );
-        this.toggle(
-            "showConsecutiveWhitespace",
-            i18n.showConsecutiveWhitespace.name,
-            i18n.showConsecutiveWhitespace.desc,
-        );
-
-        // ── Structural ────────────────────────────────────────────────────────
-        new Setting(this.containerEl)
-            .setHeading()
-            .setName(i18n.structuralSection.name);
-
-        this.toggle(
-            "showBlockquoteMarkers",
-            i18n.showBlockquoteMarkers.name,
-            i18n.showBlockquoteMarkers.desc,
-        );
-        this.toggle(
-            "outlineListMarkers",
-            i18n.highlightListMarkers.name,
-            i18n.highlightListMarkers.desc,
-        );
-
-        // ── Space dot contexts ────────────────────────────────────────────────
-        new Setting(this.containerEl)
-            .setHeading()
-            .setName(i18n.spaceContextsSection.name);
-        this.containerEl.createEl("p", {
-            text: i18n.spaceContextsSection.desc,
-        });
-
-        this.toggle(
-            "showFrontmatterWhitespace",
-            i18n.showFrontmatterWhitespace.name,
-            i18n.showFrontmatterWhitespace.desc,
-        );
-        this.toggle(
-            "showTableWhitespace",
-            i18n.showTableWhitespace.name,
-            i18n.showTableWhitespace.desc,
-        );
-        this.toggle(
-            "showCodeblockWhitespace",
-            i18n.showCodeBlockWhitespace.name,
-            i18n.showCodeBlockWhitespace.desc,
-        );
-        this.toggle(
-            "showAllCodeblockWhitespace",
-            i18n.showAllCodeBlockWhitespace.name,
-            i18n.showAllCodeBlockWhitespace.desc,
-        );
-        this.toggle(
-            "showAllWhitespace",
-            i18n.showAllWhitespace.name,
-            i18n.showAllWhitespace.desc,
-        );
-    }
-
-    /** Save on exit */
-    hide(): void {
-        void this.save();
+            // ── Space dot contexts ───────────────────────────────────────────
+            {
+                name: i18n.spaceContextsSection.name,
+                desc: i18n.spaceContextsSection.desc,
+                render: (setting: Setting): void => {
+                    setting.setHeading();
+                },
+            },
+            this.toggle(
+                "showFrontmatterWhitespace",
+                i18n.showFrontmatterWhitespace.name,
+                i18n.showFrontmatterWhitespace.desc,
+            ),
+            this.toggle(
+                "showTableWhitespace",
+                i18n.showTableWhitespace.name,
+                i18n.showTableWhitespace.desc,
+            ),
+            this.toggle(
+                "showCodeblockWhitespace",
+                i18n.showCodeBlockWhitespace.name,
+                i18n.showCodeBlockWhitespace.desc,
+            ),
+            this.toggle(
+                "showAllCodeblockWhitespace",
+                i18n.showAllCodeBlockWhitespace.name,
+                i18n.showAllCodeBlockWhitespace.desc,
+            ),
+            this.toggle(
+                "showAllWhitespace",
+                i18n.showAllWhitespace.name,
+                i18n.showAllWhitespace.desc,
+            ),
+        ];
     }
 }
